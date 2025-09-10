@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NHP Product Analyzer - Full Stack</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px; /* Added gap for spacing */
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .status-dot.connected {
+            background: #28a745;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 2px dashed #dee2e6;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #007bff;
+            background: #f0f8ff;
+        }
+
+        .upload-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            cursor: pointer;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: none;
+            margin-right: 15px;
+        }
+
+        .file-input-wrapper:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 123, 255, 0.4);
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .file-list {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .analyze-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 20px auto;
+            display: block;
+        }
+
+        .analyze-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .report {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid #007bff;
+        }
+
+        .report h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .ingredient-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .ingredient-section h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .ingredient-item {
+            background: white;
+            margin-bottom: 15px;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #17a2b8;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .ingredient-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .ingredient-amount {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .class-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            margin-right: 10px;
+        }
+
+        .class-1 { background: #d4edda; color: #155724; }
+        .class-2 { background: #fff3cd; color: #856404; }
+        .class-3 { background: #f8d7da; color: #721c24; }
+        .non-medicinal { background: #e2e3e5; color: #383d41; }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+
+        .confidence-high { background: #d4edda; color: #155724; }
+        .confidence-medium { background: #fff3cd; color: #856404; }
+        .confidence-low { background: #f8d7da; color: #721c24; }
+
+        .reasoning {
+            font-size: 0.95em;
+            color: #495057;
+            line-height: 1.6;
+            margin-top: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 3px solid #007bff;
+        }
+
+        .summary-section {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .summary-card {
+            text-align: center;
+        }
+
+        .summary-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .summary-label {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            position: fixed; /* For alert popups */
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .alert-warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .alert-success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .alert-error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #545b62; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-sm { font-size: 0.8em; padding: 5px 10px; }
+        .ms-auto { margin-left: auto; } /* Bootstrap utility */
+
+    </style>
+</head>
+<body>
+    <div id="alertContainer"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🧪 NHP Product Analyzer</h1>
+            <p>AI-Powered Analysis using RAG & Gemini LLM - Full Stack Version</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="backendStatus"></div>
+                <span id="statusText">Checking backend connection...</span>
+            </div>
+            <div class="knowledge-status">
+                <span id="knowledgeBaseStatus">Knowledge Base: Not loaded</span>
+            </div>
+            <!-- === NEW BUTTON ADDED HERE === -->
+            <button id="resetDbBtn" class="btn btn-warning btn-sm ms-auto">Reset Knowledge Base</button>
+        </div>
+
+        <div class="main-content">
+            <!-- Monograph Upload Section -->
+            <div class="upload-section">
+                <h2>📚 Upload Monograph Data</h2>
+                <p style="margin-bottom: 15px; color: #6c757d;">Upload your NHP monograph PDFs to build the RAG knowledge base</p>
+                
+                <label class="file-input-wrapper">
+                    <input type="file" id="monographFiles" accept=".pdf" multiple>
+                    📄 Select Monograph PDFs
+                </label>
+                
+                <button id="uploadMonographsBtn" class="btn btn-secondary" style="display: none;">
+                    🔄 Process Monographs
+                </button>
+                
+                <div class="progress-bar" id="monographProgress" style="display: none;">
+                    <div class="progress-fill" id="monographProgressFill"></div>
+                </div>
+                
+                <div id="monographFileList" class="file-list" style="display: none;">
+                    <h4>Monograph Files:</h4>
+                </div>
+                
+                <div id="monographStatus"></div>
+            </div>
+
+            <!-- Product Upload Section -->
+            <div class="upload-section">
+                <h2>🔬 Upload Product Documents</h2>
+                <p style="margin-bottom: 15px; color: #6c757d;">Upload product specifications, formulations, or related documents for analysis</p>
+                
+                <label class="file-input-wrapper">
+                    <input type="file" id="productFiles" accept=".pdf,.doc,.docx,.txt" multiple>
+                    📋 Select Product Documents
+                </label>
+                
+                <div id="productFileList" class="file-list" style="display: none;">
+                    <h4>Product Files:</h4>
+                </div>
+            </div>
+
+            <button id="analyzeBtn" class="analyze-btn" disabled>
+                🔍 Analyze Product with RAG
+            </button>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p id="loadingText">Processing documents and performing RAG analysis...</p>
+            </div>
+
+            <div class="results-section" id="resultsSection">
+                <div class="report">
+                    <div class="summary-section">
+                        <h3>📊 Analysis Summary</h3>
+                        <div id="summaryContent" class="summary-grid"></div>
+                    </div>
+
+                    <h2>🧬 Detailed Ingredient Analysis</h2>
+                    
+                    <div class="ingredient-section">
+                        <h3>💊 Medicinal Ingredients</h3>
+                        <div id="medicinalIngredients"></div>
+                    </div>
+
+                    <div class="ingredient-section">
+                        <h3>🧪 Non-Medicinal Ingredients</h3>
+                        <div id="nonMedicinalIngredients"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Make sure this path is correct -->
+    <script src="script.js"></script>
+</body>
+</html>
