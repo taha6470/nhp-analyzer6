@@ -11,3 +11,5 @@ werkzeug==2.3.7
 transformers==4.35.0
 torch==2.1.0
 requests==2.31.0
+pdf2image==1.17.0
+poppler-utils
