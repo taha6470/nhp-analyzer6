@@ -16,29 +16,33 @@ class PDFProcessor:
         self.logger = logging.getLogger(__name__)
         # Try to find tesseract in common locations
         import shutil
+        import platform
+        
         tesseract_path = shutil.which('tesseract')
         if tesseract_path:
             pytesseract.pytesseract.tesseract_cmd = tesseract_path
+            self.logger.info(f"Using Tesseract from PATH: {tesseract_path}")
         else:
-            # Check Windows paths first
-            windows_tesseract_paths = [
-                r'C:\Program Files\Tesseract-OCR\tesseract.exe',
-                r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
-                r'C:\tesseract\tesseract.exe'
-            ]
+            # Platform-specific path detection
+            system = platform.system().lower()
             
-            # Check Linux/Mac paths
-            unix_tesseract_paths = ['/usr/bin/tesseract', '/usr/local/bin/tesseract']
-            
-            # Try Windows paths first
-            for path in windows_tesseract_paths:
-                if os.path.exists(path):
-                    pytesseract.pytesseract.tesseract_cmd = path
-                    self.logger.info(f"Using Tesseract from: {path}")
-                    break
-            
-            # If not found on Windows, try Unix paths
-            if not pytesseract.pytesseract.tesseract_cmd:
+            if system == 'windows':
+                windows_tesseract_paths = [
+                    r'D:\NHP models\poppler-25.07.0\Library\bin\tesseract.exe',  # Your specific installation
+                    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                    r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+                    r'C:\tesseract\tesseract.exe'
+                ]
+                
+                for path in windows_tesseract_paths:
+                    if os.path.exists(path):
+                        pytesseract.pytesseract.tesseract_cmd = path
+                        self.logger.info(f"Using Tesseract from: {path}")
+                        break
+            else:
+                # Linux/Mac paths
+                unix_tesseract_paths = ['/usr/bin/tesseract', '/usr/local/bin/tesseract', '/opt/homebrew/bin/tesseract']
+                
                 for path in unix_tesseract_paths:
                     if os.path.exists(path):
                         pytesseract.pytesseract.tesseract_cmd = path
@@ -57,25 +61,26 @@ class PDFProcessor:
         try:
             # Try to find poppler in common locations
             poppler_path = None
+            import platform
             
-            # Check Windows paths first (for local development only)
-            windows_paths = [
-                r'D:\NHP models\poppler-25.07.0\Library\bin',  # Your specific installation
-                r'C:\Program Files\poppler\bin',
-                r'C:\poppler\bin'
-            ]
+            system = platform.system().lower()
             
-            # Check Linux/Mac paths
-            unix_paths = ['/usr/bin', '/usr/local/bin', '/opt/homebrew/bin']
-            
-            # Try Windows paths first
-            for path in windows_paths:
-                if os.path.exists(os.path.join(path, 'pdftoppm.exe')):
-                    poppler_path = path
-                    break
-            
-            # If not found on Windows, try Unix paths
-            if not poppler_path:
+            if system == 'windows':
+                # Windows paths (for local development)
+                windows_paths = [
+                    r'D:\NHP models\poppler-25.07.0\Library\bin',  # Your specific installation
+                    r'C:\Program Files\poppler\bin',
+                    r'C:\poppler\bin'
+                ]
+                
+                for path in windows_paths:
+                    if os.path.exists(os.path.join(path, 'pdftoppm.exe')):
+                        poppler_path = path
+                        break
+            else:
+                # Linux/Mac paths (for Render deployment)
+                unix_paths = ['/usr/bin', '/usr/local/bin', '/opt/homebrew/bin']
+                
                 for path in unix_paths:
                     if os.path.exists(os.path.join(path, 'pdftoppm')):
                         poppler_path = path
