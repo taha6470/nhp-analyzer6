@@ -15,7 +15,21 @@ from pdf_processor import PDFProcessor
 load_dotenv()
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='/')
-CORS(app)
+# Restrict CORS to the deployed frontend domains
+allowed_origins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:5000',
+    'https://nhp-analyzer6.vercel.app',
+]
+CORS(
+    app,
+    resources={r"/api/*": {"origins": allowed_origins}},
+    supports_credentials=False,
+    allow_headers=['Content-Type', 'Authorization'],
+    methods=['GET', 'POST', 'OPTIONS'],
+    max_age=86400,
+)
 
 # Configuration
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', './uploads')
