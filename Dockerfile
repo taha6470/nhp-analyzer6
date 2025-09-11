@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED 1
 
 # Install the system dependencies that your PDF processor needs
 # This is the step that was failing before
-RUN apt-get update && apt-get install -y tesseract-ocr poppler-utils && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y tesseract-ocr poppler-utils build-essential && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
 WORKDIR /app

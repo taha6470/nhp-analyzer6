@@ -1,17 +1,24 @@
-flask==2.3.3
-flask-cors==4.0.0
-PyPDF2==3.0.1
-sentence-transformers==2.2.2
-chromadb==0.4.15
-google-generativeai==0.3.2
-python-dotenv==1.0.0
-numpy==1.24.3
-pandas==2.0.3
-werkzeug==2.3.7
-transformers==4.35.0
-torch==2.1.0
-requests==2.31.0
-pdf2image==1.16.3
-pytesseract==0.3.10
-Pillow==10.0.1
-gunicorn==21.2.0
+# --- PASTE THIS INTO backend/requirements.txt ---
+
+flask
+flask-cors
+gunicorn
+python-dotenv
+werkzeug
+
+# PDF and OCR Processing - Updated Pillow
+PyPDF2
+pdf2image
+pytesseract
+Pillow>=10.3.0
+
+# RAG and AI
+sentence-transformers
+chromadb
+google-generativeai
+transformers
+torch
+
+# General Utilities
+numpy
+requests
