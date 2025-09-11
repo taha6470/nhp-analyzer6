@@ -2,12 +2,19 @@ import re
 import os
 import logging
 from typing import List, Dict, Optional
-import pytesseract
+try:
+    import pytesseract
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
+    pytesseract = None
+    print("Warning: pytesseract not available. OCR functionality will be limited.")
 from pdf2image import convert_from_path
 
 class PDFProcessor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+<<<<<<< HEAD
         # Try to find tesseract in common locations
         import shutil
         tesseract_path = shutil.which('tesseract')
@@ -38,6 +45,15 @@ class PDFProcessor:
                         pytesseract.pytesseract.tesseract_cmd = path
                         self.logger.info(f"Using Tesseract from: {path}")
                         break
+=======
+        if TESSERACT_AVAILABLE and pytesseract:
+            # Use pytesseract functionality
+            pass
+        else:
+            # Alternative processing without OCR
+            pass
+        pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+>>>>>>> 6371982008047e1c21827adb74f3fc8054e60563
         
         self.spec_sheet_medicinal_patterns = [r'Active Ingredients:(.*?)(?=Inactive Ingredients:|FORMULATION:|Total weight:|$)']
         self.spec_sheet_non_medicinal_patterns = [r'Inactive Ingredients:(.*?)(?=Total weight:|$)']
