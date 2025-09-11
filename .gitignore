@@ -1,18 +1,17 @@
 # Ignore the Python virtual environment
 /myenv/
+.env
 
 # Ignore Python cache files
 __pycache__/
 *.pyc
 
 # Ignore generated data, databases, and caches
-/backend/data/embeddings/
-/backend/data/processed/
-/backend/data/analysis_cache.json
-
-# Ignore uploaded PDF files
+/backend/data/
 /backend/uploads/
-/backend/data/monographs/
 
 # Ignore VS Code specific settings
 .vscode/
+
+# Ignore machine learning model caches
+.cache/
