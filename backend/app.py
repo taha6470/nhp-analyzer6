@@ -23,8 +23,8 @@ allowed_origins = [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:5000',
+    'http://localhost:8000',  # <-- ADD THIS LINE
     'https://nhp-analyzer6.vercel.app', # Your frontend URL
-    # Add any other frontend URLs if necessary
 ]
 CORS(
     app,

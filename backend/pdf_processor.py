@@ -39,7 +39,6 @@ class PDFProcessor:
         
         system = platform.system().lower()
         if system == 'windows':
-            # Fallback for Windows if not in PATH
             windows_paths = [r'C:\Program Files\Tesseract-OCR\tesseract.exe', r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe']
             for path in windows_paths:
                 if os.path.exists(path):
@@ -51,18 +50,18 @@ class PDFProcessor:
 
     def extract_text(self, pdf_path: str) -> Optional[str]:
         try:
-            # Poppler path detection
-            poppler_path = None
-            if platform.system().lower() == 'windows':
-                # Local Windows development fallback
-                if os.path.exists(r'C:\poppler\bin'):
-                    poppler_path = r'C:\poppler\bin'
+            # --- START OF MODIFICATION FOR LOCAL DEVELOPMENT ---
+            # This hardcoded path will fix the Poppler error on your local Windows machine.
+            # Make sure this path points to the 'bin' subfolder of your Poppler installation.
+            local_poppler_path = r"D:\NHP models\poppler-25.07.0\Library\bin"
             
             try:
-                images = convert_from_path(pdf_path, poppler_path=poppler_path)
+                # Use the hardcoded path when running locally
+                images = convert_from_path(pdf_path, poppler_path=local_poppler_path)
             except Exception as poppler_error:
-                self.logger.error(f"Failed to convert PDF. Ensure 'poppler-utils' is installed. Error: {poppler_error}")
+                self.logger.error(f"Failed to convert PDF with local path. Error: {poppler_error}")
                 return None
+            # --- END OF MODIFICATION ---
 
             full_text = ""
             for image in images:

@@ -1,12 +1,11 @@
 # --- PASTE THIS INTO backend/requirements.txt ---
-
 flask
 flask-cors
 gunicorn
 python-dotenv
 werkzeug
 
-# PDF and OCR Processing - Updated Pillow
+# PDF and OCR Processing
 PyPDF2
 pdf2image
 pytesseract

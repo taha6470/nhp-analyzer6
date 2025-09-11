@@ -1,0 +1,7 @@
+# --- PASTE THIS INTO .dockerignore ---
+__pycache__/
+*.pyc
+.cache/
+.env
+/backend/data/
+/backend/uploads/
