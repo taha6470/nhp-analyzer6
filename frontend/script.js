@@ -4,7 +4,7 @@ class NHPAnalyzer {
     constructor() {
         this.backendUrl = window.location.hostname.includes('localhost')
             ? 'http://localhost:5000'
-            : 'https://nhp-analyzer6.onrender.com/'; // <-- PASTE THE NEW URL HERE
+            : 'https://nhp-analyzer6.onrender.com'; // <-- PASTE THE NEW URL HERE
         this.monographFiles = [];
         this.productFiles = [];
         this.isBackendConnected = false;
