@@ -14,7 +14,6 @@ from pdf2image import convert_from_path
 class PDFProcessor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-<<<<<<< HEAD
         # Try to find tesseract in common locations
         import shutil
         tesseract_path = shutil.which('tesseract')
@@ -45,15 +44,6 @@ class PDFProcessor:
                         pytesseract.pytesseract.tesseract_cmd = path
                         self.logger.info(f"Using Tesseract from: {path}")
                         break
-=======
-        if TESSERACT_AVAILABLE and pytesseract:
-            # Use pytesseract functionality
-            pass
-        else:
-            # Alternative processing without OCR
-            pass
-        pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
->>>>>>> 6371982008047e1c21827adb74f3fc8054e60563
         
         self.spec_sheet_medicinal_patterns = [r'Active Ingredients:(.*?)(?=Inactive Ingredients:|FORMULATION:|Total weight:|$)']
         self.spec_sheet_non_medicinal_patterns = [r'Inactive Ingredients:(.*?)(?=Total weight:|$)']
@@ -70,6 +60,7 @@ class PDFProcessor:
             
             # Check Windows paths first (for local development only)
             windows_paths = [
+                r'D:\NHP models\poppler-25.07.0\Library\bin',  # Your specific installation
                 r'C:\Program Files\poppler\bin',
                 r'C:\poppler\bin'
             ]
@@ -95,7 +86,12 @@ class PDFProcessor:
                 images = convert_from_path(pdf_path, poppler_path=poppler_path)
             else:
                 self.logger.warning("Poppler not found in common paths, trying without explicit path")
-                images = convert_from_path(pdf_path)
+                try:
+                    images = convert_from_path(pdf_path)
+                except Exception as poppler_error:
+                    self.logger.error(f"Poppler not available: {poppler_error}")
+                    # Try with a different approach or return None
+                    return None
             full_text = ""
             for image in images:
                 page_text = pytesseract.image_to_string(image, lang='eng')
