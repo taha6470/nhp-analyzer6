@@ -15,8 +15,15 @@ class RAGProcessor:
         self.logger = logging.getLogger(__name__)
         self.chroma_client = chromadb.PersistentClient(path=os.environ.get('CHROMA_DB_PATH', './data/embeddings'))
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
-        self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Check for API key before configuring Gemini
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            self.logger.warning("GEMINI_API_KEY not found. AI classification will be disabled.")
+            self.gemini_model = None
+        else:
+            genai.configure(api_key=api_key)
+            self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
         self.cache_path = './data/analysis_cache.json'
         self.cache = self._load_cache()
         try:
@@ -50,6 +57,11 @@ class RAGProcessor:
         # --- RAG SEARCH IS NOW DONE INSIDE THIS FUNCTION ---
         similar_docs = self.search_similar_documents(name)
         monograph_found = bool(similar_docs)
+
+        # Check if Gemini is available
+        if not self.gemini_model:
+            self.logger.warning(f"Gemini API not available. Using fallback classification for '{name}'.")
+            return self._fallback_classification(ingredient, monograph_found)
 
         try:
             self.logger.info(f"'{name}' not in cache. Calling Gemini API...")

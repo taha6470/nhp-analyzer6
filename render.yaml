@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: nhp-analyzer-backend
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: |
+      apt-get update
+      apt-get install -y tesseract-ocr poppler-utils
+      pip install -r backend/requirements.txt
+    startCommand: cd backend && python app.py
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CHROMA_DB_PATH
+        value: ./data/embeddings
+      - key: UPLOAD_FOLDER
+        value: ./uploads

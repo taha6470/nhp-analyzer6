@@ -14,7 +14,7 @@ from pdf_processor import PDFProcessor
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__, static_folder='../frontend/dist', static_url_path='/')
+app = Flask(__name__, static_folder='../frontend', static_url_path='/')
 CORS(app)
 
 # Configuration
@@ -145,11 +145,17 @@ def reset_database():
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
-    static_folder = app.static_folder or '../frontend/dist'
+    static_folder = app.static_folder or '../frontend'
     if path != "" and os.path.exists(os.path.join(static_folder, path)):
         return send_from_directory(static_folder, path)
-    else: return send_from_directory(static_folder, 'index.html')
+    else: 
+        return send_from_directory(static_folder, 'index.html')
 if __name__ == '__main__':
     logger.info("Starting NHP Analyzer Backend...")
     logger.info(f"Upload folder: {app.config['UPLOAD_FOLDER']}")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    
+    # Get port from environment variable (Render sets this)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    
+    app.run(debug=debug, host='0.0.0.0', port=port)

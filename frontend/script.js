@@ -1,6 +1,9 @@
 class NHPAnalyzer {
     constructor() {
-        this.backendUrl = 'http://localhost:5000';
+        // Use Render URL in production, localhost in development
+        this.backendUrl = window.location.hostname === 'localhost' 
+            ? 'http://localhost:5000' 
+            : 'https://nhp-analyzer-backend.onrender.com';
         this.monographFiles = [];
         this.productFiles = [];
         this.isBackendConnected = false;

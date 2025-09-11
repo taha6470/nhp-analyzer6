@@ -1,4 +1,5 @@
 import re
+import os
 import logging
 from typing import List, Dict, Optional
 import pytesseract
@@ -7,7 +8,36 @@ from pdf2image import convert_from_path
 class PDFProcessor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+        # Try to find tesseract in common locations
+        import shutil
+        tesseract_path = shutil.which('tesseract')
+        if tesseract_path:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+        else:
+            # Check Windows paths first
+            windows_tesseract_paths = [
+                r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+                r'C:\tesseract\tesseract.exe'
+            ]
+            
+            # Check Linux/Mac paths
+            unix_tesseract_paths = ['/usr/bin/tesseract', '/usr/local/bin/tesseract']
+            
+            # Try Windows paths first
+            for path in windows_tesseract_paths:
+                if os.path.exists(path):
+                    pytesseract.pytesseract.tesseract_cmd = path
+                    self.logger.info(f"Using Tesseract from: {path}")
+                    break
+            
+            # If not found on Windows, try Unix paths
+            if not pytesseract.pytesseract.tesseract_cmd:
+                for path in unix_tesseract_paths:
+                    if os.path.exists(path):
+                        pytesseract.pytesseract.tesseract_cmd = path
+                        self.logger.info(f"Using Tesseract from: {path}")
+                        break
         
         self.spec_sheet_medicinal_patterns = [r'Active Ingredients:(.*?)(?=Inactive Ingredients:|FORMULATION:|Total weight:|$)']
         self.spec_sheet_non_medicinal_patterns = [r'Inactive Ingredients:(.*?)(?=Total weight:|$)']
@@ -19,7 +49,37 @@ class PDFProcessor:
 
     def extract_text(self, pdf_path: str) -> Optional[str]:
         try:
-            images = convert_from_path(pdf_path, poppler_path=r'D:\NHP models\poppler-25.07.0\Library\bin')
+            # Try to find poppler in common locations
+            poppler_path = None
+            
+            # Check Windows paths first (for local development only)
+            windows_paths = [
+                r'C:\Program Files\poppler\bin',
+                r'C:\poppler\bin'
+            ]
+            
+            # Check Linux/Mac paths
+            unix_paths = ['/usr/bin', '/usr/local/bin', '/opt/homebrew/bin']
+            
+            # Try Windows paths first
+            for path in windows_paths:
+                if os.path.exists(os.path.join(path, 'pdftoppm.exe')):
+                    poppler_path = path
+                    break
+            
+            # If not found on Windows, try Unix paths
+            if not poppler_path:
+                for path in unix_paths:
+                    if os.path.exists(os.path.join(path, 'pdftoppm')):
+                        poppler_path = path
+                        break
+            
+            if poppler_path:
+                self.logger.info(f"Using Poppler from: {poppler_path}")
+                images = convert_from_path(pdf_path, poppler_path=poppler_path)
+            else:
+                self.logger.warning("Poppler not found in common paths, trying without explicit path")
+                images = convert_from_path(pdf_path)
             full_text = ""
             for image in images:
                 page_text = pytesseract.image_to_string(image, lang='eng')
