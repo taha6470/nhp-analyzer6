@@ -30,4 +30,4 @@ COPY backend/ .
 
 # The command to run your app using a production-grade Gunicorn server
 # It automatically uses the PORT that Render provides
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:${PORT}", "--timeout", "120"]
+CMD gunicorn app:app --bind 0.0.0.0:${PORT} --timeout 120
