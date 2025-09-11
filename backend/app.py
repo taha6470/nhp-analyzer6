@@ -1,3 +1,5 @@
+# --- Paste this into your backend/app.py file ---
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
@@ -5,7 +7,7 @@ import json
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 import logging
-import threading # <-- NEW: Import for background tasks
+import threading
 
 # Import our custom modules
 from rag_processor import RAGProcessor
@@ -15,12 +17,14 @@ from pdf_processor import PDFProcessor
 load_dotenv()
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='/')
+
 # Restrict CORS to the deployed frontend domains
 allowed_origins = [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:5000',
-    'https://nhp-analyzer6.vercel.app',
+    'https://nhp-analyzer6.vercel.app', # Your frontend URL
+    # Add any other frontend URLs if necessary
 ]
 CORS(
     app,
@@ -50,7 +54,6 @@ ALLOWED_EXTENSIONS = {'pdf'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# --- NEW: Function to run the heavy processing in the background ---
 def process_monographs_background(files_to_process):
     """
     This function runs in a separate thread, so it doesn't block the web server.
@@ -77,7 +80,6 @@ def process_monographs_background(files_to_process):
         rag_processor.build_knowledge_base('data/processed')
         logger.info("Knowledge base rebuild complete.")
 
-# --- UPDATED: The upload route now returns immediately ---
 @app.route('/api/upload-monographs', methods=['POST'])
 def upload_monographs():
     try:
@@ -86,7 +88,6 @@ def upload_monographs():
         files = request.files.getlist('files')
         files_to_process = []
         
-        # Quickly save files and prepare the list for the background task
         for file in files:
             if not file.filename or not allowed_file(file.filename): continue
             filename = secure_filename(file.filename)
@@ -97,11 +98,9 @@ def upload_monographs():
         if not files_to_process:
             return jsonify({'message': 'No valid PDF files to process.'}), 400
 
-        # Start the long-running task in a background thread
         thread = threading.Thread(target=process_monographs_background, args=(files_to_process,))
         thread.start()
 
-        # Immediately return a "202 Accepted" response to the user
         return jsonify({
             'message': f'Accepted {len(files_to_process)} files. The knowledge base will be updated in the background.'
         }), 202
@@ -110,7 +109,6 @@ def upload_monographs():
         logger.error(f"Error handling monograph upload request: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
-# ... The rest of your app.py file is perfect and does not need changes ...
 @app.route('/api/analyze-product', methods=['POST'])
 def analyze_product():
     try:
@@ -137,25 +135,29 @@ def analyze_product():
     except Exception as e:
         logger.error(f"Error analyzing product: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
 def generate_analysis_summary(ingredient_analyses):
     summary = {'total_ingredients': len(ingredient_analyses), 'medicinal_count': 0, 'non_medicinal_count': 0, 'class_distribution': {'class_1': 0, 'class_2': 0, 'class_3': 0}, 'high_confidence_count': 0}
     for ing in ingredient_analyses:
         if ing['type'] == 'medicinal':
             summary['medicinal_count'] += 1
-            class_num = ing['classification'].get('class')
+            class_num = ing.get('classification', {}).get('class')
             if class_num in [1, 2, 3]: summary['class_distribution'][f'class_{class_num}'] += 1
         else: summary['non_medicinal_count'] += 1
-        if ing['confidence_score'] > 0.7: summary['high_confidence_count'] += 1
+        if ing.get('confidence_score', 0) > 0.7: summary['high_confidence_count'] += 1
     return summary
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'healthy','rag_initialized': rag_processor.is_initialized(),'monographs_loaded': rag_processor.get_document_count()})
+
 @app.route('/api/reset-database', methods=['POST'])
 def reset_database():
     try:
         rag_processor.reset_knowledge_base()
         return jsonify({'message': 'Database reset successfully'})
     except Exception as e: return jsonify({'error': str(e)}), 500
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
@@ -164,12 +166,9 @@ def serve(path):
         return send_from_directory(static_folder, path)
     else: 
         return send_from_directory(static_folder, 'index.html')
+
+# This block is for local development only. Gunicorn will not run this.
 if __name__ == '__main__':
-    logger.info("Starting NHP Analyzer Backend...")
-    logger.info(f"Upload folder: {app.config['UPLOAD_FOLDER']}")
-    
-    # Get port from environment variable (Render sets this)
+    logger.info("Starting NHP Analyzer Backend in DEVELOPMENT mode...")
     port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV') != 'production'
-    
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=port)

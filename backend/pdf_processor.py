@@ -1,7 +1,11 @@
+# --- Paste this into your backend/pdf_processor.py file ---
+
 import re
 import os
 import logging
 from typing import List, Dict, Optional
+import shutil
+import platform
 try:
     import pytesseract
     TESSERACT_AVAILABLE = True
@@ -14,40 +18,7 @@ from pdf2image import convert_from_path
 class PDFProcessor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        # Try to find tesseract in common locations
-        import shutil
-        import platform
-        
-        tesseract_path = shutil.which('tesseract')
-        if tesseract_path:
-            pytesseract.pytesseract.tesseract_cmd = tesseract_path
-            self.logger.info(f"Using Tesseract from PATH: {tesseract_path}")
-        else:
-            # Platform-specific path detection
-            system = platform.system().lower()
-            
-            if system == 'windows':
-                windows_tesseract_paths = [
-                    r'D:\NHP models\poppler-25.07.0\Library\bin\tesseract.exe',  # Your specific installation
-                    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
-                    r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
-                    r'C:\tesseract\tesseract.exe'
-                ]
-                
-                for path in windows_tesseract_paths:
-                    if os.path.exists(path):
-                        pytesseract.pytesseract.tesseract_cmd = path
-                        self.logger.info(f"Using Tesseract from: {path}")
-                        break
-            else:
-                # Linux/Mac paths
-                unix_tesseract_paths = ['/usr/bin/tesseract', '/usr/local/bin/tesseract', '/opt/homebrew/bin/tesseract']
-                
-                for path in unix_tesseract_paths:
-                    if os.path.exists(path):
-                        pytesseract.pytesseract.tesseract_cmd = path
-                        self.logger.info(f"Using Tesseract from: {path}")
-                        break
+        self._find_tesseract()
         
         self.spec_sheet_medicinal_patterns = [r'Active Ingredients:(.*?)(?=Inactive Ingredients:|FORMULATION:|Total weight:|$)']
         self.spec_sheet_non_medicinal_patterns = [r'Inactive Ingredients:(.*?)(?=Total weight:|$)']
@@ -57,46 +28,42 @@ class PDFProcessor:
         ]
         self.amount_patterns = [r'(\d+(?:\.\d+)?)\s*(mg|g|mcg|μg|µg|IU|%|ppm|units?)']
 
+    def _find_tesseract(self):
+        if not TESSERACT_AVAILABLE: return
+
+        tesseract_path = shutil.which('tesseract')
+        if tesseract_path:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+            self.logger.info(f"Using Tesseract from PATH: {tesseract_path}")
+            return
+        
+        system = platform.system().lower()
+        if system == 'windows':
+            # Fallback for Windows if not in PATH
+            windows_paths = [r'C:\Program Files\Tesseract-OCR\tesseract.exe', r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe']
+            for path in windows_paths:
+                if os.path.exists(path):
+                    pytesseract.pytesseract.tesseract_cmd = path
+                    self.logger.info(f"Using Tesseract from fallback: {path}")
+                    return
+        
+        self.logger.warning("Tesseract command not found in PATH. OCR will likely fail.")
+
     def extract_text(self, pdf_path: str) -> Optional[str]:
         try:
-            # Try to find poppler in common locations
+            # Poppler path detection
             poppler_path = None
-            import platform
+            if platform.system().lower() == 'windows':
+                # Local Windows development fallback
+                if os.path.exists(r'C:\poppler\bin'):
+                    poppler_path = r'C:\poppler\bin'
             
-            system = platform.system().lower()
-            
-            if system == 'windows':
-                # Windows paths (for local development)
-                windows_paths = [
-                    r'D:\NHP models\poppler-25.07.0\Library\bin',  # Your specific installation
-                    r'C:\Program Files\poppler\bin',
-                    r'C:\poppler\bin'
-                ]
-                
-                for path in windows_paths:
-                    if os.path.exists(os.path.join(path, 'pdftoppm.exe')):
-                        poppler_path = path
-                        break
-            else:
-                # Linux/Mac paths (for Render deployment)
-                unix_paths = ['/usr/bin', '/usr/local/bin', '/opt/homebrew/bin']
-                
-                for path in unix_paths:
-                    if os.path.exists(os.path.join(path, 'pdftoppm')):
-                        poppler_path = path
-                        break
-            
-            if poppler_path:
-                self.logger.info(f"Using Poppler from: {poppler_path}")
+            try:
                 images = convert_from_path(pdf_path, poppler_path=poppler_path)
-            else:
-                self.logger.warning("Poppler not found in common paths, trying without explicit path")
-                try:
-                    images = convert_from_path(pdf_path)
-                except Exception as poppler_error:
-                    self.logger.error(f"Poppler not available: {poppler_error}")
-                    # Try with a different approach or return None
-                    return None
+            except Exception as poppler_error:
+                self.logger.error(f"Failed to convert PDF. Ensure 'poppler-utils' is installed. Error: {poppler_error}")
+                return None
+
             full_text = ""
             for image in images:
                 page_text = pytesseract.image_to_string(image, lang='eng')
@@ -118,19 +85,8 @@ class PDFProcessor:
         try:
             medicinal = self._extract_from_section(text, self.spec_sheet_medicinal_patterns, 'medicinal', self._parse_table_section)
             non_medicinal = self._extract_from_section(text, self.spec_sheet_non_medicinal_patterns, 'non_medicinal', self._parse_table_section)
-            if medicinal or non_medicinal:
-                ingredients.extend(medicinal)
-                ingredients.extend(non_medicinal)
-            else:
-                for pattern in self.monograph_title_patterns:
-                    try:
-                        title_match = re.search(pattern, text, re.MULTILINE | re.IGNORECASE)
-                        if title_match:
-                            name = self._clean_ingredient_name(title_match.group(1))
-                            if len(name) > 2 and 'certificate of analysis' not in name.lower():
-                                ingredients.append({'name': name, 'type': 'medicinal'})
-                                break
-                    except re.error: pass
+            ingredients.extend(medicinal)
+            ingredients.extend(non_medicinal)
             
             unique_ingredients = self._remove_duplicates(ingredients)
             self.logger.info(f"Extracted {len(unique_ingredients)} unique ingredients")
@@ -152,23 +108,14 @@ class PDFProcessor:
 
     def _parse_table_section(self, section: str, ingredient_type: str) -> List[Dict]:
         ingredients = []
-        # --- MORE JUNK WORDS TO IGNORE ---
         ignore_phrases = ['each tablet contains', 'source ingredient', 'mg/tablet', '% by weight', 'ingredient', 'amount']
         lines = [line.strip() for line in section.split('\n') if line.strip()]
         
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            # Simple line stitching for parenthetical continuations
-            if line.endswith('(') and i + 1 < len(lines):
-                line = line + " " + lines[i+1]
-                i += 1
-            
+        for line in lines:
             if any(phrase in line.lower() for phrase in ignore_phrases):
-                i += 1
                 continue
 
-            match = re.search(r'\s+(\d{1,4}(?:,\d{3})*(?:\.\d+)?)\s+', line)
+            match = re.search(r'\s+(\d{1,4}(?:,\d{3})*(?:\.\d+)?)\s*', line)
             name, amount = line, None
             if match:
                 name = line[:match.start()].strip()
@@ -182,7 +129,6 @@ class PDFProcessor:
             cleaned_name = self._clean_ingredient_name(name)
             if len(cleaned_name) > 2:
                 ingredients.append({'name': cleaned_name, 'amount': amount, 'type': ingredient_type})
-            i += 1
         return ingredients
 
     def _clean_ingredient_name(self, name: str) -> str:
