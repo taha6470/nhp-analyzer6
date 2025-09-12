@@ -30,7 +30,6 @@ class PDFProcessor:
             self.logger.info(f"Using Tesseract from PATH: {tesseract_path}")
 
     def extract_text_from_pdf(self, pdf_path: str) -> Optional[str]:
-        """Prioritizes direct text extraction, falling back to OCR for image-based pages."""
         full_text = ""
         try:
             doc = fitz.open(pdf_path)
@@ -50,26 +49,19 @@ class PDFProcessor:
             return None
 
     def extract_ingredients(self, text: str) -> List[Dict]:
-        """
-        Master function that tries a sequence of parsing strategies.
-        It stops and returns as soon as one strategy is successful.
-        """
         if not text: return []
-
         parsing_strategies = [
             self._parse_composition_statement,
             self._parse_formulation_document,
             self._parse_inspection_form,
-            self._parse_coa_main_ingredient,
-            self._parse_generic_document
+            self._parse_coa_and_sidi, # Updated Parser
+            self._parse_generic_document # Updated Parser
         ]
-
         for strategy in parsing_strategies:
             ingredients = strategy(text)
             if ingredients:
                 self.logger.info(f"Successfully extracted ingredients using strategy: {strategy.__name__}")
                 return self._remove_duplicates(ingredients)
-
         self.logger.warning("All parsing strategies failed. No ingredients found.")
         return []
 
@@ -109,31 +101,36 @@ class PDFProcessor:
             if name: return [{'name': name, 'type': 'medicinal'}]
         return []
 
-    def _parse_coa_main_ingredient(self, text: str) -> List[Dict]:
-        if "certificate of analysis" not in text.lower(): return []
-        title_match = re.search(r'CERTIFICATE OF ANALYSIS\s*\n(.*?)\n', text, re.IGNORECASE)
-        if title_match:
-            name = self._clean_ingredient_name(title_match.group(1))
-            if name: return [{'name': name, 'type': 'medicinal'}]
-        first_test_match = re.search(r'TESTS\s*\n(.*?)\n', text, re.IGNORECASE)
-        if first_test_match:
-             name = self._clean_ingredient_name(first_test_match.group(1))
-             if name: return [{'name': name, 'type': 'medicinal'}]
+    def _parse_coa_and_sidi(self, text: str) -> List[Dict]:
+        # --- NEW SMARTER LOGIC ---
+        # Looks for keyword: value pairs
+        keywords = ['Product Name', 'Material Description', 'ITEM DESCRIPTION', 'Common or Usual Name']
+        for line in text.split('\n'):
+            for keyword in keywords:
+                if keyword.lower() in line.lower():
+                    # Split the line at the keyword or a colon, take the second part
+                    parts = re.split(r':|{}'.format(re.escape(keyword)), line, maxsplit=1, flags=re.IGNORECASE)
+                    if len(parts) > 1:
+                        name = self._clean_ingredient_name(parts[1])
+                        if name:
+                            return [{'name': name, 'type': 'medicinal'}]
         return []
 
     def _parse_generic_document(self, text: str) -> List[Dict]:
-        patterns = [
-            r'PRODUCT NAME\s*[:\s]+([\w\s\(\)2,7-]+)',
-            r'DESCRIPTION\s*[:\s]+([\w\s,]+)',
-            r'Material Description:\s*([\w\s]+)'
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                name = self._clean_ingredient_name(match.group(1))
-                if name: return [{'name': name, 'type': 'medicinal'}]
+        # Fallback that just looks for the first non-trivial line after the main title
+        title_patterns = ['CERTIFICATE OF ANALYSIS', 'STANDARD INFORMATION ON DIETARY INGREDIENT']
+        for line in text.split('\n'):
+            # If we find a title, we reset and look at the next few lines
+            if any(title.lower() in line.lower() for title in title_patterns):
+                # Check the next line
+                try:
+                    next_line = text.split(line)[1].strip().split('\n')[0]
+                    name = self._clean_ingredient_name(next_line)
+                    if name: return [{'name': name, 'type': 'medicinal'}]
+                except IndexError:
+                    continue # Reached end of file
         return []
-
+        
     def _get_name_from_line(self, line: str) -> Optional[str]:
         line = line.strip()
         if not line or line.lower().startswith(("active", "inactive")): return None
@@ -146,8 +143,9 @@ class PDFProcessor:
 
     def _clean_ingredient_name(self, name: str) -> Optional[str]:
         if not name: return None
-        name = re.sub(r'\b(PharmaPure|MenaQ7|ppm|Oil)\b', '', name, flags=re.IGNORECASE)
-        name = re.sub(r'\s*\d{4,}', '', name)
+        # More aggressive cleaning
+        name = re.sub(r'\b(PharmaPure|MenaQ7|ppm|Oil|G\)|Evyap)\b', '', name, flags=re.IGNORECASE)
+        name = re.sub(r'\s*\d{4,}', '', name) # Remove numbers with 4+ digits
         name = re.sub(r'\s*\([^)]*\)', '', name)
         name = re.sub(r'[,\*:]', '', name).strip()
         if len(name.split()) > 7 or len(name) < 3: return None
