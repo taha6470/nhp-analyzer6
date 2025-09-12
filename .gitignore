@@ -1,4 +1,7 @@
-# Ignore the Python virtual environment
+# --- PASTE THIS ENTIRE CONTENT into your .gitignore file ---
+
+# Ignore Python virtual environments
+/venv/
 /myenv/
 .env
 
