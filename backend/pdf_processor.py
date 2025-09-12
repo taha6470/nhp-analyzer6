@@ -51,11 +51,11 @@ class PDFProcessor:
     def extract_ingredients(self, text: str) -> List[Dict]:
         if not text: return []
         parsing_strategies = [
-            self._parse_composition_statement,
             self._parse_formulation_document,
+            self._parse_composition_statement,
             self._parse_inspection_form,
-            self._parse_coa_and_sidi, # Updated Parser
-            self._parse_generic_document # Updated Parser
+            self._parse_coa_and_sidi,
+            self._parse_generic_document
         ]
         for strategy in parsing_strategies:
             ingredients = strategy(text)
@@ -64,6 +64,30 @@ class PDFProcessor:
                 return self._remove_duplicates(ingredients)
         self.logger.warning("All parsing strategies failed. No ingredients found.")
         return []
+
+    # --- FINAL, MOST ROBUST PARSERS ---
+
+    def _parse_formulation_document(self, text: str) -> List[Dict]:
+        content_match = re.search(r'FORMULATION:.*?EACH TABLET CONTAINS:(.*?)(?=Total weight:|\Z)', text, re.IGNORECASE | re.DOTALL)
+        if not content_match: return []
+        
+        content = content_match.group(1)
+        active_section_match = re.search(r'Active Ingredients:(.*?)(?=Inactive Ingredients:|\Z)', content, re.IGNORECASE | re.DOTALL)
+        inactive_section_match = re.search(r'Inactive Ingredients:(.*)', content, re.IGNORECASE | re.DOTALL)
+        
+        ingredients = []
+        if active_section_match:
+            lines = self._process_section_lines(active_section_match.group(1))
+            for line in lines:
+                name = self._get_name_from_table_line(line)
+                if name: ingredients.append({'name': name, 'type': 'medicinal'})
+
+        if inactive_section_match:
+            lines = self._process_section_lines(inactive_section_match.group(1))
+            for line in lines:
+                name = self._get_name_from_table_line(line)
+                if name: ingredients.append({'name': name, 'type': 'non_medicinal'})
+        return ingredients
 
     def _parse_composition_statement(self, text: str) -> List[Dict]:
         composition_match = re.search(r'Section 8 - Origin and Composition\n(.*?)(?=\n\n|\Z)', text, re.IGNORECASE | re.DOTALL)
@@ -76,24 +100,7 @@ class PDFProcessor:
                 name = self._clean_ingredient_name(parts[0])
                 if name: ingredients.append({'name': name, 'type': 'medicinal'})
         return ingredients
-
-    def _parse_formulation_document(self, text: str) -> List[Dict]:
-        content_match = re.search(r'FORMULATION:.*?EACH TABLET CONTAINS:(.*?)(?=Total weight:|\Z)', text, re.IGNORECASE | re.DOTALL)
-        if not content_match: return []
-        content = content_match.group(1)
-        active_match = re.search(r'Active Ingredients:(.*?)(?=Inactive Ingredients:|\Z)', content, re.IGNORECASE | re.DOTALL)
-        inactive_match = re.search(r'Inactive Ingredients:(.*)', content, re.IGNORECASE | re.DOTALL)
-        ingredients = []
-        if active_match:
-            for line in active_match.group(1).strip().split('\n'):
-                name = self._get_name_from_line(line)
-                if name: ingredients.append({'name': name, 'type': 'medicinal'})
-        if inactive_match:
-            for line in inactive_match.group(1).strip().split('\n'):
-                name = self._get_name_from_line(line)
-                if name: ingredients.append({'name': name, 'type': 'non_medicinal'})
-        return ingredients
-
+        
     def _parse_inspection_form(self, text: str) -> List[Dict]:
         match = re.search(r'Item Name\s+([\w\s\(\)\- mcg,]+?)\s*\(', text, re.IGNORECASE)
         if match:
@@ -102,52 +109,72 @@ class PDFProcessor:
         return []
 
     def _parse_coa_and_sidi(self, text: str) -> List[Dict]:
-        # --- NEW SMARTER LOGIC ---
-        # Looks for keyword: value pairs
         keywords = ['Product Name', 'Material Description', 'ITEM DESCRIPTION', 'Common or Usual Name']
         for line in text.split('\n'):
             for keyword in keywords:
                 if keyword.lower() in line.lower():
-                    # Split the line at the keyword or a colon, take the second part
                     parts = re.split(r':|{}'.format(re.escape(keyword)), line, maxsplit=1, flags=re.IGNORECASE)
                     if len(parts) > 1:
                         name = self._clean_ingredient_name(parts[1])
-                        if name:
-                            return [{'name': name, 'type': 'medicinal'}]
+                        if name: return [{'name': name, 'type': 'medicinal'}]
         return []
 
     def _parse_generic_document(self, text: str) -> List[Dict]:
-        # Fallback that just looks for the first non-trivial line after the main title
         title_patterns = ['CERTIFICATE OF ANALYSIS', 'STANDARD INFORMATION ON DIETARY INGREDIENT']
         for line in text.split('\n'):
-            # If we find a title, we reset and look at the next few lines
             if any(title.lower() in line.lower() for title in title_patterns):
-                # Check the next line
                 try:
                     next_line = text.split(line)[1].strip().split('\n')[0]
                     name = self._clean_ingredient_name(next_line)
                     if name: return [{'name': name, 'type': 'medicinal'}]
-                except IndexError:
-                    continue # Reached end of file
+                except IndexError: continue
         return []
         
-    def _get_name_from_line(self, line: str) -> Optional[str]:
-        line = line.strip()
-        if not line or line.lower().startswith(("active", "inactive")): return None
-        name_match = re.match(r'^([a-zA-Z\s,()-]+?)(?=\s{2,}| \d|\t|$)', line)
-        if name_match: return self._clean_ingredient_name(name_match.group(1))
-        return None
+    # --- FINAL, MOST ROBUST HELPER FUNCTIONS ---
+
+    def _process_section_lines(self, section_text: str) -> List[str]:
+        """
+        Cleans and stitches together multi-line ingredients from a text block.
+        """
+        lines = section_text.strip().split('\n')
+        processed_lines = []
+        for line in lines:
+            line = line.strip()
+            if not line: continue
+            # Filter out table headers
+            if 'mg/tablet' in line.lower() and '% by weight' in line.lower(): continue
+            
+            # Check if this line is a continuation of the previous line
+            # (e.g., starts with a lowercase letter or is a single word in parentheses)
+            if (processed_lines and (line[0].islower() or re.match(r'^\([\w\s®]+\)$', line))):
+                processed_lines[-1] += " " + line # Append to the previous line
+            else:
+                processed_lines.append(line)
+        return processed_lines
+
+    def _get_name_from_table_line(self, line: str) -> Optional[str]:
+        """
+        Extracts the name from a table line by stripping off the numeric columns.
+        """
+        # Remove the numeric columns (mg/Tablet, % by Weight) from the right side
+        name = re.sub(r'\s+\d+\.\d+.*', '', line).strip()
+        return self._clean_ingredient_name(name)
 
     def _clean_text(self, text: str) -> str:
         return re.sub(r'\n\s*\n', '\n\n', text).strip()
 
     def _clean_ingredient_name(self, name: str) -> Optional[str]:
         if not name: return None
-        # More aggressive cleaning
-        name = re.sub(r'\b(PharmaPure|MenaQ7|ppm|Oil|G\)|Evyap)\b', '', name, flags=re.IGNORECASE)
-        name = re.sub(r'\s*\d{4,}', '', name) # Remove numbers with 4+ digits
-        name = re.sub(r'\s*\([^)]*\)', '', name)
+        name = name.strip()
+        # Clean specific technical specs more carefully
+        name = re.sub(r'\s*\(NLT.*?\)', '', name, flags=re.IGNORECASE).strip()
+        name = re.sub(r'\s*\(\d{1,3}(\.\d+)?%\s*.*?\)', '', name).strip()
+        
+        # General cleanup
+        name = re.sub(r'\b(PharmaPure|MenaQ7|ppm|Oil|G\)|Evyap|WONF)\b', '', name, flags=re.IGNORECASE)
+        name = re.sub(r'\s*\d{4,}', '', name)
         name = re.sub(r'[,\*:]', '', name).strip()
+        
         if len(name.split()) > 7 or len(name) < 3: return None
         return name
 
