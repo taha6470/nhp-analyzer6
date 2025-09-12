@@ -57,10 +57,10 @@ class PDFProcessor:
         if not text: return []
 
         parsing_strategies = [
-            self._parse_composition_statement, # New, high-confidence parser
+            self._parse_composition_statement,
             self._parse_formulation_document,
             self._parse_inspection_form,
-            self._parse_coa_main_ingredient, # New, medium-confidence parser
+            self._parse_coa_main_ingredient,
             self._parse_generic_document
         ]
 
@@ -73,16 +73,13 @@ class PDFProcessor:
         self.logger.warning("All parsing strategies failed. No ingredients found.")
         return []
 
-    # --- NEW, HIGH-CONFIDENCE PARSER ---
     def _parse_composition_statement(self, text: str) -> List[Dict]:
-        """Looks for a 'Section 8 - Origin and Composition' table."""
         composition_match = re.search(r'Section 8 - Origin and Composition\n(.*?)(?=\n\n|\Z)', text, re.IGNORECASE | re.DOTALL)
         if not composition_match: return []
-
         ingredients = []
         lines = composition_match.group(1).strip().split('\n')
-        for line in lines[1:]: # Skip header row
-            parts = re.split(r'\s{2,}', line) # Split by 2 or more spaces
+        for line in lines[1:]:
+            parts = re.split(r'\s{2,}', line)
             if parts:
                 name = self._clean_ingredient_name(parts[0])
                 if name: ingredients.append({'name': name, 'type': 'medicinal'})
@@ -91,11 +88,9 @@ class PDFProcessor:
     def _parse_formulation_document(self, text: str) -> List[Dict]:
         content_match = re.search(r'FORMULATION:.*?EACH TABLET CONTAINS:(.*?)(?=Total weight:|\Z)', text, re.IGNORECASE | re.DOTALL)
         if not content_match: return []
-        
         content = content_match.group(1)
         active_match = re.search(r'Active Ingredients:(.*?)(?=Inactive Ingredients:|\Z)', content, re.IGNORECASE | re.DOTALL)
         inactive_match = re.search(r'Inactive Ingredients:(.*)', content, re.IGNORECASE | re.DOTALL)
-        
         ingredients = []
         if active_match:
             for line in active_match.group(1).strip().split('\n'):
@@ -114,18 +109,12 @@ class PDFProcessor:
             if name: return [{'name': name, 'type': 'medicinal'}]
         return []
 
-    # --- NEW, MEDIUM-CONFIDENCE PARSER ---
     def _parse_coa_main_ingredient(self, text: str) -> List[Dict]:
-        """Looks for the ingredient in the title of a Certificate of Analysis."""
         if "certificate of analysis" not in text.lower(): return []
-
-        # Try to find the title line
         title_match = re.search(r'CERTIFICATE OF ANALYSIS\s*\n(.*?)\n', text, re.IGNORECASE)
         if title_match:
             name = self._clean_ingredient_name(title_match.group(1))
             if name: return [{'name': name, 'type': 'medicinal'}]
-
-        # Fallback: look for the first test item in the table
         first_test_match = re.search(r'TESTS\s*\n(.*?)\n', text, re.IGNORECASE)
         if first_test_match:
              name = self._clean_ingredient_name(first_test_match.group(1))
@@ -145,7 +134,6 @@ class PDFProcessor:
                 if name: return [{'name': name, 'type': 'medicinal'}]
         return []
 
-    # --- Helper Functions ---
     def _get_name_from_line(self, line: str) -> Optional[str]:
         line = line.strip()
         if not line or line.lower().startswith(("active", "inactive")): return None
@@ -158,9 +146,8 @@ class PDFProcessor:
 
     def _clean_ingredient_name(self, name: str) -> Optional[str]:
         if not name: return None
-        # Remove specific phrases and patterns that are not part of the name
         name = re.sub(r'\b(PharmaPure|MenaQ7|ppm|Oil)\b', '', name, flags=re.IGNORECASE)
-        name = re.sub(r'\s*\d{4,}', '', name) # Remove numbers with 4+ digits
+        name = re.sub(r'\s*\d{4,}', '', name)
         name = re.sub(r'\s*\([^)]*\)', '', name)
         name = re.sub(r'[,\*:]', '', name).strip()
         if len(name.split()) > 7 or len(name) < 3: return None

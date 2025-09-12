@@ -53,14 +53,10 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def process_monographs_background(files_to_process):
-    """
-    This function runs in a separate thread, so it doesn't block the web server.
-    """
     logger.info(f"Starting background processing for {len(files_to_process)} files.")
     processed_any = False
     for filename, filepath in files_to_process:
         try:
-            # --- FIX #1: Use the new, correct function name ---
             text_content = pdf_processor.extract_text_from_pdf(filepath)
             
             if text_content:
@@ -84,27 +80,21 @@ def process_monographs_background(files_to_process):
 def upload_monographs():
     try:
         if 'files' not in request.files: return jsonify({'error': 'No files provided'}), 400
-        
         files = request.files.getlist('files')
         files_to_process = []
-        
         for file in files:
             if not file.filename or not allowed_file(file.filename): continue
             filename = secure_filename(file.filename)
             filepath = os.path.join('data/monographs', filename) 
             file.save(filepath)
             files_to_process.append((filename, filepath))
-
         if not files_to_process:
             return jsonify({'message': 'No valid PDF files to process.'}), 400
-
         thread = threading.Thread(target=process_monographs_background, args=(files_to_process,))
         thread.start()
-
         return jsonify({
             'message': f'Accepted {len(files_to_process)} files. The knowledge base will be updated in the background.'
         }), 202
-
     except Exception as e:
         logger.error(f"Error handling monograph upload request: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
@@ -120,7 +110,6 @@ def analyze_product():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
             
-            # --- FIX #2: Use the new, correct function name ---
             product_text = pdf_processor.extract_text_from_pdf(filepath)
 
             if not product_text:
@@ -173,7 +162,6 @@ def serve(path):
     else: 
         return send_from_directory(static_folder, 'index.html')
 
-# This block is for local development only. Gunicorn will not run this.
 if __name__ == '__main__':
     logger.info("Starting NHP Analyzer Backend in DEVELOPMENT mode...")
     port = int(os.environ.get('PORT', 5000))

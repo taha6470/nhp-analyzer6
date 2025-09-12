@@ -1,4 +1,4 @@
-# --- PASTE THIS ENTIRE BLOCK INTO your new Dockerfile ---
+# --- PASTE THIS ENTIRE BLOCK INTO your Dockerfile ---
 
 # Use an official, lean Python runtime as a base
 FROM python:3.11-slim
@@ -9,7 +9,6 @@ ENV PYTHONUNBUFFERED 1
 
 # --- THE CRITICAL STEP ---
 # Install all system dependencies your app needs (Poppler, Tesseract, and compilers)
-# This is the step that fixes the error
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     poppler-utils \
