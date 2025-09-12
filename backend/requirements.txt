@@ -1,15 +1,17 @@
-# --- PASTE THIS INTO backend/requirements.txt ---
+# --- PASTE THIS ENTIRE CONTENT into backend/requirements.txt ---
+
 flask
 flask-cors
 gunicorn
 python-dotenv
 werkzeug
 
-# PDF and OCR Processing
+# PDF and OCR Processing - Updated Pillow and added PyMuPDF
 PyPDF2
 pdf2image
 pytesseract
 Pillow>=10.3.0
+PyMuPDF
 
 # RAG and AI
 sentence-transformers

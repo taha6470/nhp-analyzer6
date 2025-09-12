@@ -1,5 +1,3 @@
-# --- Paste this into your backend/app.py file ---
-
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
@@ -23,7 +21,7 @@ allowed_origins = [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:5000',
-    'http://localhost:8000',  # <-- ADD THIS LINE
+    'http://localhost:8000',
     'https://nhp-analyzer6.vercel.app', # Your frontend URL
 ]
 CORS(
@@ -62,7 +60,9 @@ def process_monographs_background(files_to_process):
     processed_any = False
     for filename, filepath in files_to_process:
         try:
-            text_content = pdf_processor.extract_text(filepath)
+            # --- FIX #1: Use the new, correct function name ---
+            text_content = pdf_processor.extract_text_from_pdf(filepath)
+            
             if text_content:
                 text_filename = filename.rsplit('.', 1)[0] + '.txt'
                 text_filepath = os.path.join('data/processed', text_filename)
@@ -119,18 +119,24 @@ def analyze_product():
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
-            product_text = pdf_processor.extract_text(filepath)
+            
+            # --- FIX #2: Use the new, correct function name ---
+            product_text = pdf_processor.extract_text_from_pdf(filepath)
+
             if not product_text:
                 analysis_results.append({'filename': filename, 'error': 'Could not extract text.'})
                 os.remove(filepath); continue
+            
             ingredients = pdf_processor.extract_ingredients(product_text)
             ingredient_analyses = []
             for ingredient in ingredients:
                 classification = rag_processor.classify_ingredient(ingredient)
                 ingredient_analyses.append({'name': ingredient['name'],'amount': ingredient.get('amount', 'N/A'),'type': ingredient['type'],'classification': classification,'confidence_score': classification.get('confidence', 0)})
+            
             analysis = {'filename': filename,'total_ingredients': len(ingredients),'medicinal_ingredients': [ing for ing in ingredient_analyses if ing['type'] == 'medicinal'],'non_medicinal_ingredients': [ing for ing in ingredient_analyses if ing['type'] == 'non_medicinal'],'summary': generate_analysis_summary(ingredient_analyses)}
             analysis_results.append(analysis)
             os.remove(filepath)
+            
         return jsonify({'message': 'Analysis completed successfully', 'analyses': analysis_results})
     except Exception as e:
         logger.error(f"Error analyzing product: {str(e)}", exc_info=True)
